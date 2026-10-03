@@ -1,0 +1,14 @@
+# build artifacts
+build/
+JUCE/build/
+
+# clangd
+.cache/
+compile_commands.json
+.clangd/index
+
+#vscode
+.vscode/*
+#!.vscode/extensions.json
+#!.vscode/settings.json
+
