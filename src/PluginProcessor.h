@@ -1,5 +1,6 @@
 #pragma once
 #include <juce_audio_processors/juce_audio_processors.h>
+#include <fstream>
 
 class GainExampleProcessor : public juce::AudioProcessor {
 public:
@@ -14,7 +15,17 @@ public:
         return l.getMainOutputChannelSet() == l.getMainInputChannelSet();
     }
 
+    int count = 0;
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override {
+        // Write to file once at the start to prove callback fires
+        static std::ofstream log("/tmp/gain_debug.log", std::ios::trunc);
+        if (log.is_open()) {
+            log << "[" << count << "]" << " Processing samples=" << buffer.getNumSamples() << "\n";
+            count++;
+        }
+
+
+
         // pure gain — no locks, no allocation, realtime-safe
         for (int ch = 0; ch < buffer.getNumChannels(); ++ch)
             buffer.applyGain(ch, 0, buffer.getNumSamples(), 0.5f);
