@@ -1,16 +1,18 @@
 #pragma once
+#include "juce_audio_basics/juce_audio_basics.h"
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
-class GainExampleProcessor : public juce::AudioProcessor {
+class TwoPoleLowPassProcessor : public juce::AudioProcessor {
 public:
-    GainExampleProcessor()
+    TwoPoleLowPassProcessor()
         : AudioProcessor(BusesProperties()
               .withInput("Input", juce::AudioChannelSet::stereo(), true)
               .withOutput("Output", juce::AudioChannelSet::stereo(), true)),
           apvts(*this, nullptr, "Parameters", createParameterLayout()) {}
 
     using AudioProcessor::processBlock;
+    using AudioProcessor::processBlockBypassed;
 
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout() {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
@@ -37,11 +39,23 @@ public:
 
         filterL.prepare(spec);
         filterR.prepare(spec);
+
+        wetMix.reset(sampleRate, 0.02);
+        wetMix.setCurrentAndTargetValue(1.0f);
     }
 
     void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override {
-        auto freq = apvts.getRawParameterValue("freq")->load();
+        wetMix.setTargetValue(1.0f);
+        processCommon(buffer);
+    }
 
+    void processBlockBypassed(juce::AudioBuffer<float>& buffer, juce::MidiBuffer&) override {
+        wetMix.setTargetValue(0.0f);
+        processCommon(buffer);
+    }
+
+    void processCommon(juce::AudioBuffer<float>& buffer) {
+        auto freq = apvts.getRawParameterValue("freq")->load();
         if(std::abs(lastFreq - freq) > 0.5f) {
             auto coeffs  = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, freq, 0.707f);
             filterL.coefficients = coeffs;
@@ -53,13 +67,11 @@ public:
         auto* R = buffer.getNumChannels() > 1 ? buffer.getWritePointer(1) : nullptr;
 
         for (int i = 0; i < buffer.getNumSamples(); ++i) {
-            L[i] = filterL.processSample(L[i]);
+            auto w = wetMix.getNextValue();
+            L[i] = L[i] * (1.0f - w) + filterL.processSample(L[i]) * w;
+            if (R != nullptr)
+                    R[i] = R[i] * (1.0f - w) + filterR.processSample(R[i]) * w;
         }
-        if (R != nullptr)
-            for (int i = 0; i < buffer.getNumSamples(); ++i) {
-                R[i] = filterR.processSample(R[i]);
-            }
-
     }
 
     juce::AudioProcessorEditor* createEditor() override;
@@ -88,8 +100,9 @@ public:
 private:
     juce::AudioProcessorValueTreeState apvts;
     juce::dsp::IIR::Filter<float> filterL, filterR;
+    juce::SmoothedValue<float> wetMix {1.0f};
     double sampleRate = 44100.0;
     float lastFreq = -1.0f;
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(GainExampleProcessor)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TwoPoleLowPassProcessor)
     
 };
