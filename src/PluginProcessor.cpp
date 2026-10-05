@@ -8,31 +8,45 @@ juce::AudioProcessorEditor* TwoPoleLowPassProcessor::createEditor() {
         explicit GainEditor(TwoPoleLowPassProcessor& p) : AudioProcessorEditor(p), proc(p) {
             titleLabel.setText("Cutoff Hz", juce::dontSendNotification);
             titleLabel.setJustificationType(juce::Justification::centred);
-            titleLabel.setFont(juce::Font(16.0f).withExtraKerningFactor(0.0f));
+            titleLabel.setFont(juce::Font(juce::FontOptions(16.0f)).withExtraKerningFactor(0.0f));
             addAndMakeVisible(titleLabel);
             
-            slider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
-            slider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 20);
-            slider.setRange(800.0, 6400.0, 0.1);
-            slider.setSkewFactorFromMidPoint(1600.0);
-            addAndMakeVisible(slider);
-            attachment = std::make_unique<
-                juce::AudioProcessorValueTreeState::SliderAttachment>(
-                    proc.apvts, "freq", slider);
-            setSize(300, 300);
+            cutoffSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+            cutoffSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 80, 20);
+            cutoffSlider.setRange(80.0, 6400.0, 0.1);
+            cutoffSlider.setSkewFactorFromMidPoint(1600.0);
+            addAndMakeVisible(cutoffSlider);
+            
+            qLabel.setText("Resonance", juce::dontSendNotification);
+            qLabel.setJustificationType(juce::Justification::centred);
+            qLabel.setFont(juce::Font(juce::FontOptions(16.0f)));
+            addAndMakeVisible(qLabel);
+
+            qSlider.setSliderStyle(juce::Slider::RotaryVerticalDrag);
+            qSlider.setTextBoxStyle(juce::Slider::TextBoxBelow, false, 60, 18);
+            qSlider.setRange(0.1, 2.0, 0.01);
+            addAndMakeVisible(qSlider);
+
+            cutoffAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "cutoff", cutoffSlider);
+            qAttachment = std::make_unique<juce::AudioProcessorValueTreeState::SliderAttachment>(proc.apvts, "q", qSlider);
+
+
+            setSize(320, 400);
         }
         void resized() override { 
-            titleLabel.setBounds(50,25,200,25);
-            slider.setBounds(50, 50, 200, 200); 
+            titleLabel.setBounds(60,20,200,20);
+            cutoffSlider.setBounds(60, 40, 200, 200);
+            qLabel.setBounds(60,250,200,20);
+            qSlider.setBounds(60,270,200,100); 
         }
         void paint(juce::Graphics& g) override { 
             g.fillAll(juce::Colours::darkgrey); 
         }
 
         TwoPoleLowPassProcessor& proc;
-        juce::Label titleLabel;
-        juce::Slider slider;
-        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> attachment;
+        juce::Label titleLabel, qLabel;
+        juce::Slider cutoffSlider, qSlider;
+        std::unique_ptr<juce::AudioProcessorValueTreeState::SliderAttachment> cutoffAttachment, qAttachment;
     };
     return new GainEditor(*this);
 }

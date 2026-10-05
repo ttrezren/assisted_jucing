@@ -1,5 +1,6 @@
 #pragma once
 #include "juce_audio_basics/juce_audio_basics.h"
+#include "juce_audio_processors_headless/juce_audio_processors_headless.h"
 #include <juce_dsp/juce_dsp.h>
 #include <juce_audio_processors/juce_audio_processors.h>
 
@@ -17,11 +18,16 @@ public:
     static juce::AudioProcessorValueTreeState::ParameterLayout createParameterLayout() {
         juce::AudioProcessorValueTreeState::ParameterLayout layout;
         layout.add(std::make_unique<juce::AudioParameterFloat>(
-            juce::ParameterID { "freq", 1 },          // param ID, version hint
-            "Freq",                                     // human-readable name
-            juce::NormalisableRange<float>(800.0f, 6400.0f, 0.1f),  // hertz
+            juce::ParameterID { "cutoff", 1 },          // param ID, version hint
+            "Cutoff Hz",                                     // human-readable name
+            juce::NormalisableRange<float>(80.0f, 6400.0f, 0.1f, 0.5f),  // hertz
             2000.0f));                                    // default: unity
-        return layout;
+        layout.add(std::make_unique<juce::AudioParameterFloat>(
+            juce::ParameterID {"q", 1},
+            "Q",
+            juce::NormalisableRange<float>(0.1f, 2.0f, 0.01f, 0.4f),
+            0.797f));
+            return layout;
     }
 
     void releaseResources() override {}
@@ -55,12 +61,14 @@ public:
     }
 
     void processCommon(juce::AudioBuffer<float>& buffer) {
-        auto freq = apvts.getRawParameterValue("freq")->load();
-        if(std::abs(lastFreq - freq) > 0.5f) {
-            auto coeffs  = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, freq, 0.707f);
+        auto cutoff = apvts.getRawParameterValue("cutoff")->load();      
+        auto q      = apvts.getRawParameterValue("q")->load();
+        if(std::abs(lastCutoff - cutoff) > 0.5f || std::abs(lastQ - q) > 0.02f) {
+            auto coeffs  = juce::dsp::IIR::Coefficients<float>::makeLowPass(sampleRate, cutoff, q);
             filterL.coefficients = coeffs;
             filterR.coefficients = coeffs;
-            lastFreq = freq;
+            lastCutoff = cutoff;
+            lastQ = q;
         }
 
         auto* L = buffer.getWritePointer(0);
@@ -102,7 +110,8 @@ private:
     juce::dsp::IIR::Filter<float> filterL, filterR;
     juce::SmoothedValue<float> wetMix {1.0f};
     double sampleRate = 44100.0;
-    float lastFreq = -1.0f;
+    float lastCutoff = -1.0f;
+    float lastQ = 0.707f;
     JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(TwoPoleLowPassProcessor)
     
 };
